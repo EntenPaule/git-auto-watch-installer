@@ -11,7 +11,6 @@ REPO_DIR="$BASE_DIR/local-repo"
 WATCH_DIRS=("$HOME/printer_data/config" "$HOME/printer_data/database")
 SCRIPT_FILE="$BASE_DIR/git-auto-watch.sh"
 ENV_FILE="$BASE_DIR/.env"
-GITIGNORE_FILE="$BASE_DIR/.gitignore"
 SERVICE_FILE="$HOME/.config/systemd/user/git-auto-watch.service"
 LOG_FILE="$BASE_DIR/git-auto-watch.log"
 BRANCH="main"
@@ -107,36 +106,38 @@ debug() {
     [ "$ENABLE_DEBUG" = true ] && log "DEBUG: $*"
 }
 
+LOCKFILE="/tmp/git-auto-watch.lock"
 log "Starte Überwachung..."
 
 while true; do
     inotifywait -r -e modify,create,delete,move $WATCH_DIRS > /dev/null 2>&1
 
-    for dir in $WATCH_DIRS; do
-        name=$(basename "$dir")
-        target="$REPO_DIR/$name"
-        mkdir -p "$target"
+    flock "$LOCKFILE" -c '
+        for dir in '"${WATCH_DIRS[*]}"'; do
+            name=$(basename "$dir")
+            target="$REPO_DIR/$name"
+            mkdir -p "$target"
 
-        rsync -a --delete --checksum "$dir/" "$target/"
+            rsync -a --delete --checksum "$dir/" "$target/"
 
-        cd "$REPO_DIR" || continue
-        git add -A
+            cd "$REPO_DIR" || continue
+            git add -A
 
-        if ! git diff --cached --quiet; then
-            TIMESTAMP=$(date "+%Y-%m-%d %H:%M:%S")
-            git commit -m "Auto-Update: $TIMESTAMP"
-            git push origin "$BRANCH" > /dev/null 2>&1
-            log "Änderung gepusht: $TIMESTAMP"
+            if ! git diff --cached --quiet; then
+                TIMESTAMP=$(date "+%Y-%m-%d %H:%M:%S")
+                git commit -m "Auto-Update: $TIMESTAMP"
+                git push origin "$BRANCH" > /dev/null 2>&1
+                log "Änderung gepusht: $TIMESTAMP"
 
-            if [ "$USE_MCU_UPDATE" = true ]; then
-                MCU="$HOME/printer_data/config/script/updatemcu.sh"
-                [ -x "$MCU" ] && "$MCU" && log "MCU-Skript ausgeführt"
+                if [ "$USE_MCU_UPDATE" = true ]; then
+                    MCU="$HOME/printer_data/config/script/updatemcu.sh"
+                    [ -x "$MCU" ] && "$MCU" && log "MCU-Skript ausgeführt"
+                fi
+            else
+                debug "Keine Änderungen erkannt"
             fi
-        else
-            debug "Keine Änderungen erkannt"
-        fi
-    done
-
+        done
+    '
 done
 EOF
 
