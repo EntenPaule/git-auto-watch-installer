@@ -109,7 +109,8 @@ for dir in "${WATCH_DIRS[@]}"; do
     if [ ! -d "$dir" ]; then
         echo -e "${RED}❌ Verzeichnis nicht gefunden: $dir${NC}"
         echo -e "${RED}Bitte sicherstellen, dass alle überwachten Verzeichnisse vorhanden sind.${NC}"
-        exit 1
+        echo -e "${YLW}📁 Erstelle Verzeichnis: $dir${NC}"
+        mkdir -p "$dir"
     fi
 
 done
