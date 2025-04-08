@@ -222,7 +222,7 @@ fi
 
 # Update-Manager-Eintrag direkt in moonraker.conf schreiben
 MOON_CFG="$HOME/printer_data/config/moonraker.conf"
-INSTALLER_NAME="git-auto-watch-installer"
+INSTALLER_NAME="klipper-conf-git"
 
 if grep -q "^\[update_manager $INSTALLER_NAME\]" "$MOON_CFG" 2>/dev/null; then
     echo -e "${YLW}ℹ️  Update Manager-Eintrag für '$INSTALLER_NAME' existiert bereits in moonraker.conf.${NC}"
@@ -231,9 +231,10 @@ else
     cat >> "$MOON_CFG" <<EOF
 
 [update_manager $INSTALLER_NAME]
+primary_branch: main
 type: git_repo
 path: $HOME/git-auto-watch-installer
-origin: https://github.com/$GITHUB_USER/git-auto-watch-installer.git
+origin: https://github.com/$GITHUB_USER/klipper-conf-git.git
 EOF
     echo -e "${GRN}✅ Update Manager-Eintrag hinzugefügt.${NC}"
 
