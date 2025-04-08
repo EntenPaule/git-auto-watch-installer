@@ -241,9 +241,6 @@ EOF
     echo -e "${YLW}🔁 Starte Moonraker neu, damit der Eintrag aktiv wird...${NC}"
     sudo systemctl restart moonraker.service
     echo -e "${GRN}✅ Moonraker wurde neu gestartet.${NC}"
-fi
-fi
-fi
 
 # moonraker.asvc Eintrag für Service-Verwaltung
 ASVC_FILE="$HOME/printer_data/moonraker.asvc"
