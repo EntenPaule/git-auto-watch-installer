@@ -187,37 +187,37 @@ EOF
 chmod +x "$SCRIPT_FILE"
 
 # systemd-Service erstellen
-SERVICE_FILE="/etc/systemd/system/klipper-conf-git.service"
+SERVICE_FILE="$HOME/.config/systemd/user/klipper-conf-git.service"
+mkdir -p "$(dirname "$SERVICE_FILE")"
 cat > "$SERVICE_FILE" <<EOF
 [Unit]
 Description=Git Auto Watcher für Klipper-Config
-After=network.target
+After=network-online.target
 
 [Service]
 Type=simple
-User=$USER
 ExecStart=$SCRIPT_FILE
 Restart=always
 Environment=ENV_FILE=$ENV_FILE
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=default.target
 EOF
 
-systemctl daemon-reexec
-systemctl enable --now klipper-conf-git.service
+systemctl --user daemon-reexec
+systemctl --user enable --now klipper-conf-git.service
 
 
 # Selbsttest
 sleep 1
-STATUS=$(systemctl --user is-active git-auto-watch.service)
+STATUS=$(systemctl --user is-active klipper-conf-git.service)
 if [ "$STATUS" = "active" ]; then
     echo -e "
 ${GRN}🟢 Dienst läuft einwandfrei.${NC}"
 else
     echo -e "
 ${RED}🔴 Dienst konnte nicht gestartet werden.${NC}"
-    journalctl --user -u git-auto-watch.service --no-pager -n 10
+    journalctl --user -u klipper-conf-git.service --no-pager -n 10
 fi
 
 # Update-Manager-Eintrag erstellen
