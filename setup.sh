@@ -125,55 +125,6 @@ fi
 git remote add origin "git@github.com:$GITHUB_USER/$REPO_NAME.git"
 git push -u origin "$BRANCH" --force
 
-# === Watcher-Skript ===
-cat > "$SCRIPT_FILE" <<'EOF'
-#!/bin/bash
-source "$(dirname "$0")/.env"
-
-log() {
-    [ "$ENABLE_LOGGING" = true ] && echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "$LOG_FILE"
-}
-debug() {
-    [ "$ENABLE_DEBUG" = true ] && log "DEBUG: $*"
-}
-
-LOCKFILE="/tmp/git-auto-watch.lock"
-log "Starte Überwachung..."
-
-while true; do
-    inotifywait -r -e modify,create,delete,move $WATCH_DIRS > /dev/null 2>&1
-
-    flock "$LOCKFILE" -c '
-        for dir in '"${WATCH_DIRS[*]}"'; do
-            name=$(basename "$dir")
-            target="$REPO_DIR/$name"
-            mkdir -p "$target"
-
-            rsync -a --delete --checksum "$dir/" "$target/"
-
-            cd "$REPO_DIR" || continue
-            git add -A
-
-            if ! git diff --cached --quiet; then
-                TIMESTAMP=$(date "+%Y-%m-%d %H:%M:%S")
-                git commit -m "Auto-Update: $TIMESTAMP"
-                git push origin "$BRANCH" > /dev/null 2>&1
-                log "Änderung gepusht: $TIMESTAMP"
-
-                if [ "$USE_MCU_UPDATE" = true ]; then
-                    MCU="$HOME/printer_data/config/script/updatemcu.sh"
-                    [ -x "$MCU" ] && "$MCU" && log "MCU-Skript ausgeführt"
-                fi
-            else
-                debug "Keine Änderungen erkannt"
-            fi
-        done
-    '
-done
-EOF
-
-chmod +x "$SCRIPT_FILE"
-
 # systemd-Service erstellen
 cat > "$SERVICE_FILE" <<EOF
 [Unit]
@@ -196,7 +147,10 @@ systemctl --user enable --now git-auto-watch.service
 "$SCRIPT_FILE" --setup
 
 # Ergebnis anzeigen
-echo -e "\n\n${GRN}✅ Alles eingerichtet und gestartet!${NC}\n"
+echo -e "
+
+${GRN}✅ Alles eingerichtet und gestartet!${NC}
+"
 echo -e "📦 Repo:        ${BLU}$REPO_NAME${NC}"
 echo -e "👤 User:        ${BLU}$GIT_NAME <$GIT_EMAIL>${NC}"
 echo -e "📁 Watch:       ${BLU}${WATCH_DIRS[*]}${NC}"
@@ -204,6 +158,9 @@ echo -e "🧪 MCU-Update:  ${BLU}$USE_MCU_UPDATE${NC}"
 echo -e "📝 Logfile:     ${BLU}$LOG_FILE${NC}"
 echo -e "📂 Repo-Ordner: ${BLU}$REPO_DIR${NC}"
 
-echo -e "\n🔍 Prüfe Status mit:\n  ${YLW}tail -f $LOG_FILE${NC}"
-echo -e "\n⏎ ${BLU}Drücke [Enter] zum Beenden des Setups ...${NC}"
+echo -e "
+🔍 Prüfe Status mit:
+  ${YLW}tail -f $LOG_FILE${NC}"
+echo -e "
+⏎ ${BLU}Drücke [Enter] zum Beenden des Setups ...${NC}"
 read
