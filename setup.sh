@@ -26,7 +26,7 @@ fi
 BASE_DIR="$HOME/git-auto-watch"
 REPO_DIR="$BASE_DIR/local-repo"
 WATCH_DIRS=("$HOME/printer_data/config" "$HOME/printer_data/database")
-SCRIPT_FILE="$BASE_DIR/git-auto-watch.sh"
+SCRIPT_FILE="/usr/local/bin/git-auto-watch.sh"
 ENV_FILE="$BASE_DIR/.env"
 SERVICE_FILE="$HOME/.config/systemd/user/klipper-conf-git.service"
 LOG_FILE="$BASE_DIR/git-auto-watch.log"
@@ -136,7 +136,7 @@ git remote add origin "git@github.com:$GITHUB_USER/$REPO_NAME.git"
 git push -u origin "$BRANCH" --force
 
 # git-auto-watch.sh erzeugen
-cat > "$SCRIPT_FILE" <<'EOF'
+sudo tee "$SCRIPT_FILE" > /dev/null <<'EOF'
 #!/bin/bash
 
 source "$(dirname "$0")/.env"
@@ -184,7 +184,7 @@ while true; do
 done
 EOF
 
-chmod +x "$SCRIPT_FILE"
+sudo chmod +x "$SCRIPT_FILE"
 
 # systemd-Service erstellen
 SERVICE_FILE="$HOME/.config/systemd/user/klipper-conf-git.service"
