@@ -18,7 +18,7 @@ REPO_DIR="$BASE_DIR/local-repo"
 WATCH_DIRS=("$HOME/printer_data/config" "$HOME/printer_data/database")
 SCRIPT_FILE="$BASE_DIR/git-auto-watch.sh"
 ENV_FILE="$BASE_DIR/.env"
-SERVICE_FILE="$HOME/.config/systemd/user/git-auto-watch.service"
+SERVICE_FILE="$HOME/.config/systemd/user/klipper-conf-git.service"
 LOG_FILE="$BASE_DIR/git-auto-watch.log"
 BRANCH="main"
 
@@ -177,23 +177,25 @@ EOF
 chmod +x "$SCRIPT_FILE"
 
 # systemd-Service erstellen
+SERVICE_FILE="/etc/systemd/system/klipper-conf-git.service"
 cat > "$SERVICE_FILE" <<EOF
 [Unit]
-Description=Git Auto Watcher
-After=network-online.target
+Description=Git Auto Watcher für Klipper-Config
+After=network.target
 
 [Service]
+Type=simple
+User=$USER
 ExecStart=$SCRIPT_FILE
 Restart=always
 Environment=ENV_FILE=$ENV_FILE
 
 [Install]
-WantedBy=default.target
+WantedBy=multi-user.target
 EOF
 
-# Service starten & Setup ausführen
-systemctl --user daemon-reexec
-systemctl --user enable --now git-auto-watch.service
+systemctl daemon-reexec
+systemctl enable --now klipper-conf-git.service
 
 
 # Selbsttest
@@ -206,6 +208,23 @@ else
     echo -e "
 ${RED}🔴 Dienst konnte nicht gestartet werden.${NC}"
     journalctl --user -u git-auto-watch.service --no-pager -n 10
+fi
+
+# Update-Manager-Eintrag erstellen
+UPDATE_CFG="$HOME/printer_data/config/update_manager.cfg"
+INSTALLER_NAME="git-auto-watch-installer"
+if grep -q "^\[$INSTALLER_NAME\]" "$UPDATE_CFG" 2>/dev/null; then
+    echo -e "${YLW}ℹ️  Update Manager-Eintrag für '$INSTALLER_NAME' existiert bereits.${NC}"
+else
+    echo -e "${YLW}➕ Trage '$INSTALLER_NAME' in update_manager.cfg ein...${NC}"
+    cat >> "$UPDATE_CFG" <<EOF
+
+[$INSTALLER_NAME]
+type: git_repo
+path: $HOME/git-auto-watch-installer
+origin: https://github.com/$GITHUB_USER/git-auto-watch-installer.git
+EOF
+    echo -e "${GRN}✅ Update Manager-Eintrag hinzugefügt.${NC}"
 fi
 
 # Ergebnis anzeigen
