@@ -245,6 +245,16 @@ fi
 fi
 fi
 
+# moonraker.asvc Eintrag für Service-Verwaltung
+ASVC_FILE="$HOME/printer_data/moonraker.asvc"
+if grep -Fxq "klipper-conf-git" "$ASVC_FILE" 2>/dev/null; then
+    echo -e "${YLW}ℹ️  'klipper-conf-git' ist bereits in moonraker.asvc eingetragen.${NC}"
+else
+    echo -e "${YLW}➕ Trage 'klipper-conf-git' in moonraker.asvc ein...${NC}"
+    echo "klipper-conf-git" >> "$ASVC_FILE"
+    echo -e "${GRN}✅ moonraker.asvc aktualisiert.${NC}"
+fi
+
 # Ergebnis anzeigen
 echo -e "
 
