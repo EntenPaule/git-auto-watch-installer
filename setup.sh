@@ -13,6 +13,16 @@ GIT_EMAIL="git@entenpaule.local"
 GITHUB_USER="EntenPaule"
 
 # === Allgemeine Einstellungen ===
+
+# Wenn .env existiert, Werte laden und Setup überspringen
+if [ -f "$HOME/git-auto-watch/.env" ]; then
+    echo -e "
+${GRN}⚙️  Vorhandene Konfiguration gefunden – .env wird verwendet.${NC}"
+    source "$HOME/git-auto-watch/.env"
+    echo -e "${YLW}⏩ Setup wird übersprungen.${NC}"
+    exit 0
+fi
+
 BASE_DIR="$HOME/git-auto-watch"
 REPO_DIR="$BASE_DIR/local-repo"
 WATCH_DIRS=("$HOME/printer_data/config" "$HOME/printer_data/database")
