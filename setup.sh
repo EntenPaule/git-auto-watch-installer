@@ -1,5 +1,12 @@
 #!/bin/bash
 
+# === Farben ===
+GRN='\033[0;32m'
+RED='\033[0;31m'
+YLW='\033[1;33m'
+BLU='\033[1;34m'
+NC='\033[0m' # kein Farbcode
+
 # === Konfiguration – nur hier anpassen ===
 GIT_NAME="EntenPaule"
 GIT_EMAIL="git@entenpaule.local"
@@ -21,12 +28,12 @@ mkdir -p "$(dirname "$SERVICE_FILE")"
 
 # SSH-Key erzeugen, falls nicht vorhanden
 if [ ! -f "$HOME/.ssh/id_ed25519" ]; then
-    echo "🔐 Erstelle SSH-Key für GitHub..."
+    echo -e "${YLW}🔐 Erstelle SSH-Key für GitHub...${NC}"
     ssh-keygen -t ed25519 -C "$GIT_EMAIL" -N "" -f "$HOME/.ssh/id_ed25519"
     echo ""
-    echo "📋 Öffentlichen Schlüssel zu GitHub hinzufügen:"
+    echo -e "${BLU}📋 Öffentlichen Schlüssel zu GitHub hinzufügen:${NC}"
     cat "$HOME/.ssh/id_ed25519.pub"
-    echo "👉 https://github.com/settings/ssh/new"
+    echo -e "${BLU}👉 https://github.com/settings/ssh/new${NC}"
     read -rsp $'\n🔑 Sobald der Schlüssel hinzugefügt ist, drücke [Enter] ...\n'
 fi
 
@@ -35,7 +42,7 @@ git config --global user.name "$GIT_NAME"
 git config --global user.email "$GIT_EMAIL"
 
 # Pakete installieren
-echo "📦 Installiere Pakete..."
+echo -e "${YLW}📦 Installiere Pakete...${NC}"
 sudo apt-get update -qq
 sudo apt-get install -y git inotify-tools curl rsync
 
@@ -70,23 +77,32 @@ chmod 600 "$ENV_FILE"
 # Git-Repo initialisieren
 cd "$REPO_DIR"
 git init -b "$BRANCH"
-touch .gitkeep
-git add .
-git commit -m "Initial commit"
+
+# Erstes Synchronisieren aller WATCH_DIRS
+echo -e "${YLW}📁 Synchronisiere initiale Dateien...${NC}"
+for dir in "${WATCH_DIRS[@]}"; do
+    name=$(basename "$dir")
+    target="$REPO_DIR/$name"
+    mkdir -p "$target"
+    rsync -a --delete --checksum "$dir/" "$target/"
+done
+
+git add -A
+git commit -m "Initial commit from setup"
 
 # GitHub Repo erstellen
-echo "🌀 Erstelle GitHub-Repo '$REPO_NAME'..."
+echo -e "${YLW}🌀 Erstelle GitHub-Repo '$REPO_NAME'...${NC}"
 response=$(curl -s -w "%{http_code}" -o /tmp/github_response.json \
     -H "Authorization: token $GITHUB_TOKEN" \
     https://api.github.com/user/repos \
     -d "{\"name\":\"$REPO_NAME\", \"private\":true}")
 
 if [ "$response" = "201" ]; then
-    echo "✅ Repo erfolgreich erstellt."
+    echo -e "${GRN}✅ Repo erfolgreich erstellt.${NC}"
 elif [ "$response" = "422" ]; then
-    echo "ℹ️  Repo existiert vermutlich bereits."
+    echo -e "${YLW}ℹ️  Repo existiert vermutlich bereits.${NC}"
 else
-    echo "❌ Fehler ($response):"
+    echo -e "${RED}❌ Fehler ($response):${NC}"
     cat /tmp/github_response.json
     exit 1
 fi
@@ -164,9 +180,15 @@ systemctl --user enable --now git-auto-watch.service
 
 "$SCRIPT_FILE" --setup
 
-echo ""
-echo "✅ Alles eingerichtet!"
-echo "📦 Repo: $REPO_NAME"
-echo "👤 User: $GIT_NAME <$GIT_EMAIL>"
-echo "📁 Watch: ${WATCH_DIRS[*]}"
-echo "🧪 MCU-Update: $USE_MCU_UPDATE"
+# Ergebnis anzeigen
+echo -e "\n\n${GRN}✅ Alles eingerichtet und gestartet!${NC}\n"
+echo -e "📦 Repo:        ${BLU}$REPO_NAME${NC}"
+echo -e "👤 User:        ${BLU}$GIT_NAME <$GIT_EMAIL>${NC}"
+echo -e "📁 Watch:       ${BLU}${WATCH_DIRS[*]}${NC}"
+echo -e "🧪 MCU-Update:  ${BLU}$USE_MCU_UPDATE${NC}"
+echo -e "📝 Logfile:     ${BLU}$LOG_FILE${NC}"
+echo -e "📂 Repo-Ordner: ${BLU}$REPO_DIR${NC}"
+
+echo -e "\n🔍 Prüfe Status mit:\n  ${YLW}tail -f $LOG_FILE${NC}"
+echo -e "\n⏎ ${BLU}Drücke [Enter] zum Beenden des Setups ...${NC}"
+read
