@@ -195,6 +195,18 @@ systemctl --user daemon-reexec
 systemctl --user enable --now git-auto-watch.service
 
 
+# Selbsttest
+sleep 1
+STATUS=$(systemctl --user is-active git-auto-watch.service)
+if [ "$STATUS" = "active" ]; then
+    echo -e "
+${GRN}🟢 Dienst läuft einwandfrei.${NC}"
+else
+    echo -e "
+${RED}🔴 Dienst konnte nicht gestartet werden.${NC}"
+    journalctl --user -u git-auto-watch.service --no-pager -n 10
+fi
+
 # Ergebnis anzeigen
 echo -e "
 
@@ -212,5 +224,5 @@ echo -e "
   ${YLW}tail -f $LOG_FILE${NC}"
 echo -e "
 ⏎ ${BLU}Drücke [Enter] zum Beenden des Setups ...${NC}"
-read -r dummy_input
 cd ~
+read -r dummy_input
