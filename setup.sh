@@ -105,7 +105,7 @@ for dir in "${WATCH_DIRS[@]}"; do
         exit 1
     fi
 fi
-
+done
 # .env erzeugen
 cat > "$ENV_FILE" <<EOF
 REPO_DIR="$REPO_DIR"
