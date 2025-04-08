@@ -30,7 +30,7 @@ SCRIPT_FILE="/usr/local/bin/git-auto-watch.sh"
 ENV_FILE="$BASE_DIR/.env"
 SERVICE_FILE="$HOME/.config/systemd/user/klipper-conf-git.service"
 LOG_FILE="$BASE_DIR/git-auto-watch.log"
-BRANCH="main"
+BRANCH="master"
 
 rm -rf "$BASE_DIR"
 mkdir -p "$REPO_DIR"
@@ -231,7 +231,7 @@ else
     cat >> "$MOON_CFG" <<EOF
 
 [update_manager $INSTALLER_NAME]
-primary_branch: main
+primary_branch: master
 type: git_repo
 path: $HOME/git-auto-watch-installer
 origin: https://github.com/$GITHUB_USER/klipper-conf-git.git
