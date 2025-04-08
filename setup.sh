@@ -70,9 +70,20 @@ git config --global user.name "$GIT_NAME"
 git config --global user.email "$GIT_EMAIL"
 
 # Pakete installieren
-echo -e "${YLW}📦 Installiere Pakete...${NC}"
+function install_if_missing() {
+    for pkg in "$@"; do
+        if ! dpkg -s "$pkg" >/dev/null 2>&1; then
+            echo -e "${YLW}📦 Installiere fehlendes Paket: $pkg${NC}"
+            sudo apt-get install -y "$pkg"
+        else
+            echo -e "${GRN}✅ $pkg ist bereits installiert.${NC}"
+        fi
+    done
+}
+
+echo -e "${YLW}📦 Überprüfe erforderliche Pakete...${NC}"
 sudo apt-get update -qq
-sudo apt-get install -y git inotify-tools curl rsync
+install_if_missing git inotify-tools curl rsync
 
 # Benutzerabfragen
 DEFAULT_REPO="$(hostname)"
@@ -84,7 +95,7 @@ echo ""
 
 read -rp "🛠️  Soll 'updatemcu.sh' nach jedem Commit ausgeführt werden? (y/N): " USE_MCU
 USE_MCU_UPDATE=false
-[[ "$USE_MCU" =~ ^[Yy]$ ]] && USE_MCU_UPDATE=true
+if [[ "$USE_MCU" =~ ^[Yy]$ ]]; then USE_MCU_UPDATE=true; fi
 
 # Sicherstellen, dass Konfig-Verzeichnis vorhanden ist
 for dir in "${WATCH_DIRS[@]}"; do
@@ -94,9 +105,6 @@ for dir in "${WATCH_DIRS[@]}"; do
         exit 1
     fi
 fi
-
-# [Restlicher Inhalt folgt danach wie gehabt ... z. B. .env schreiben, Script- und Service-Setup, Repo erstellen usw.]
-
 
 # .env erzeugen
 cat > "$ENV_FILE" <<EOF
