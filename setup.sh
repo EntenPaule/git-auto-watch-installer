@@ -7,17 +7,17 @@ GITHUB_USER="EntenPaule"
 
 # === Allgemeine Einstellungen ===
 BASE_DIR="$HOME/git-auto-watch"
+REPO_DIR="$BASE_DIR/local-repo"
 WATCH_DIRS=("$HOME/printer_data/config" "$HOME/printer_data/database")
 SCRIPT_FILE="$BASE_DIR/git-auto-watch.sh"
 ENV_FILE="$BASE_DIR/.env"
 GITIGNORE_FILE="$BASE_DIR/.gitignore"
 SERVICE_FILE="$HOME/.config/systemd/user/git-auto-watch.service"
 LOG_FILE="$BASE_DIR/git-auto-watch.log"
-REPO_DIR="$BASE_DIR/local-repo"
 BRANCH="main"
 
 rm -rf "$BASE_DIR"
-mkdir -p "$BASE_DIR"
+mkdir -p "$REPO_DIR"
 mkdir -p "$(dirname "$SERVICE_FILE")"
 
 # SSH-Key erzeugen, falls nicht vorhanden
@@ -38,14 +38,14 @@ git config --global user.email "$GIT_EMAIL"
 # Pakete installieren
 echo "📦 Installiere Pakete..."
 sudo apt-get update -qq
-sudo apt-get install -y git inotify-tools curl
+sudo apt-get install -y git inotify-tools curl rsync
 
 # Benutzerabfragen
 DEFAULT_REPO="$(hostname)"
 read -rp "📦 GitHub-Repo-Name [$DEFAULT_REPO]: " REPO_NAME
 REPO_NAME=${REPO_NAME:-$DEFAULT_REPO}
 
-read -rsp "🔑 GitHub Token (wird nur lokal gespeichert): " GITHUB_TOKEN
+read -rp "🔑 GitHub Token (wird nur lokal gespeichert): " GITHUB_TOKEN
 echo ""
 
 read -rp "🛠️  Soll 'updatemcu.sh' nach jedem Commit ausgeführt werden? (y/N): " USE_MCU
@@ -54,7 +54,7 @@ USE_MCU_UPDATE=false
 
 # .env erzeugen
 cat > "$ENV_FILE" <<EOF
-WATCH_DIRS="${WATCH_DIRS[*]}"
+REPO_DIR="$REPO_DIR"
 GITHUB_USER="$GITHUB_USER"
 REPO_NAME="$REPO_NAME"
 GITHUB_TOKEN="$GITHUB_TOKEN"
@@ -63,20 +63,41 @@ ENABLE_LOGGING=true
 ENABLE_DEBUG=true
 USE_MCU_UPDATE=$USE_MCU_UPDATE
 LOG_FILE="$LOG_FILE"
+WATCH_DIRS="${WATCH_DIRS[*]}"
 EOF
 
 chmod 600 "$ENV_FILE"
 
-# .gitignore
-cat > "$GITIGNORE_FILE" <<EOF
-.env
-*.log
-EOF
+# Git-Repo initialisieren
+cd "$REPO_DIR"
+git init -b "$BRANCH"
+touch .gitkeep
+git add .
+git commit -m "Initial commit"
 
-# git-auto-watch.sh erzeugen
+# GitHub Repo erstellen
+echo "🌀 Erstelle GitHub-Repo '$REPO_NAME'..."
+response=$(curl -s -w "%{http_code}" -o /tmp/github_response.json \
+    -H "Authorization: token $GITHUB_TOKEN" \
+    https://api.github.com/user/repos \
+    -d "{\"name\":\"$REPO_NAME\", \"private\":true}")
+
+if [ "$response" = "201" ]; then
+    echo "✅ Repo erfolgreich erstellt."
+elif [ "$response" = "422" ]; then
+    echo "ℹ️  Repo existiert vermutlich bereits."
+else
+    echo "❌ Fehler ($response):"
+    cat /tmp/github_response.json
+    exit 1
+fi
+
+git remote add origin "git@github.com:$GITHUB_USER/$REPO_NAME.git"
+git push -u origin "$BRANCH" --force
+
+# === Watcher-Skript ===
 cat > "$SCRIPT_FILE" <<'EOF'
 #!/bin/bash
-
 source "$(dirname "$0")/.env"
 
 log() {
@@ -85,45 +106,6 @@ log() {
 debug() {
     [ "$ENABLE_DEBUG" = true ] && log "DEBUG: $*"
 }
-
-if [[ "$1" == "--setup" ]]; then
-    mkdir -p "$REPO_DIR"
-    cd "$REPO_DIR" || exit 1
-
-    if [ ! -d ".git" ]; then
-        log "📁 Initialisiere zentrales Git-Repo in $REPO_DIR"
-        git init -b "$BRANCH"
-        touch .gitkeep
-        git add . && git commit -m "Initial commit"
-    fi
-
-    if ! git remote get-url origin &>/dev/null; then
-        log "🌀 Erstelle GitHub-Repo '$REPO_NAME'..."
-
-        response=$(curl -s -w "%{http_code}" -o /tmp/github_response.json \
-            -H "Authorization: token $GITHUB_TOKEN" \
-            https://api.github.com/user/repos \
-            -d "{\"name\":\"$REPO_NAME\", \"private\":true}")
-
-        if [ "$response" = "201" ]; then
-            log "✅ Repo '$REPO_NAME' erstellt."
-        elif [ "$response" = "422" ]; then
-            log "ℹ️  Repo existiert vermutlich schon."
-        else
-            log "❌ Fehler beim Erstellen ($response)"
-            cat /tmp/github_response.json | tee -a "$LOG_FILE"
-            exit 1
-        fi
-
-        git remote add origin "git@github.com:$GITHUB_USER/$REPO_NAME.git"
-        git push -u origin "$BRANCH" --force
-    else
-        log "ℹ️  Remote origin bereits vorhanden."
-    fi
-
-    log "✅ Setup abgeschlossen."
-    exit 0
-fi
 
 log "Starte Überwachung..."
 
@@ -135,16 +117,17 @@ while true; do
         target="$REPO_DIR/$name"
         mkdir -p "$target"
 
-        rsync -a --delete "$dir/" "$target/"
+        rsync -a --delete --checksum "$dir/" "$target/"
 
         cd "$REPO_DIR" || continue
         git add -A
-        TIMESTAMP=$(date "+%Y-%m-%d %H:%M:%S")
-        git commit -m "Auto-Update: $TIMESTAMP" > /dev/null 2>&1
 
-        if [ $? -eq 0 ]; then
+        if ! git diff --cached --quiet; then
+            TIMESTAMP=$(date "+%Y-%m-%d %H:%M:%S")
+            git commit -m "Auto-Update: $TIMESTAMP"
             git push origin "$BRANCH" > /dev/null 2>&1
             log "Änderung gepusht: $TIMESTAMP"
+
             if [ "$USE_MCU_UPDATE" = true ]; then
                 MCU="$HOME/printer_data/config/script/updatemcu.sh"
                 [ -x "$MCU" ] && "$MCU" && log "MCU-Skript ausgeführt"
@@ -153,8 +136,8 @@ while true; do
             debug "Keine Änderungen erkannt"
         fi
     done
-done
 
+done
 EOF
 
 chmod +x "$SCRIPT_FILE"
@@ -177,6 +160,7 @@ EOF
 # Service starten & Setup ausführen
 systemctl --user daemon-reexec
 systemctl --user enable --now git-auto-watch.service
+
 "$SCRIPT_FILE" --setup
 
 echo ""
