@@ -223,6 +223,13 @@ fi
 # Update-Manager-Eintrag erstellen
 UPDATE_CFG="$HOME/printer_data/config/update_manager.cfg"
 INSTALLER_NAME="git-auto-watch-installer"
+
+mkdir -p "$(dirname "$UPDATE_CFG")"
+if [ ! -f "$UPDATE_CFG" ]; then
+    echo -e "${YLW}📄 update_manager.cfg wird neu erstellt ...${NC}"
+    touch "$UPDATE_CFG"
+fi
+
 if grep -q "^\[$INSTALLER_NAME\]" "$UPDATE_CFG" 2>/dev/null; then
     echo -e "${YLW}ℹ️  Update Manager-Eintrag für '$INSTALLER_NAME' existiert bereits.${NC}"
 else
@@ -235,6 +242,7 @@ path: $HOME/git-auto-watch-installer
 origin: https://github.com/$GITHUB_USER/git-auto-watch-installer.git
 EOF
     echo -e "${GRN}✅ Update Manager-Eintrag hinzugefügt.${NC}"
+fi
 fi
 
 # Ergebnis anzeigen
