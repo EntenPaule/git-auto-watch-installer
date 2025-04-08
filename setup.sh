@@ -19,26 +19,35 @@ if [[ "$1" == "--force" ]]; then
 fi
 
 BASE_DIR="$HOME/git-auto-watch"
-REPO_DIR="$BASE_DIR/local-repo"
-WATCH_DIRS=("$HOME/printer_data/config" "$HOME/printer_data/database")
-SCRIPT_FILE="/usr/local/bin/git-auto-watch.sh"
 ENV_FILE="$BASE_DIR/.env"
-read -rp "🤩 Soll der Dienst systemweit laufen? (y/N): " USE_SYSTEM
-if [[ "$USE_SYSTEM" =~ ^[Yy]$ ]]; then
-    SERVICE_FILE="/etc/systemd/system/klipper-conf-git.service"
-    SYSTEM_WIDE=true
-else
-    SERVICE_FILE="$HOME/.config/systemd/user/klipper-conf-git.service"
-    SYSTEM_WIDE=false
-fi
-LOG_FILE="$BASE_DIR/git-auto-watch.log"
-BRANCH="master"
 
 if [ -f "$ENV_FILE" ] && [ "$FORCE" = false ]; then
     echo -e "\n${GRN}⚙️  Vorhandene Konfiguration gefunden – .env wird verwendet.${NC}"
     source "$ENV_FILE"
     echo -e "${YLW}⏩ Setup wird übersprungen.${NC}"
     exit 0
+fi
+
+REPO_DIR="$BASE_DIR/local-repo"
+WATCH_DIRS=("$HOME/printer_data/config" "$HOME/printer_data/database")
+SCRIPT_FILE="/usr/local/bin/git-auto-watch.sh"
+SERVICE_FILE=""
+LOG_FILE="$BASE_DIR/git-auto-watch.log"
+BRANCH="master"
+
+if [ "$FORCE" = true ]; then
+    echo -e "${YLW}⚠️  Erzwinge Setup trotz vorhandener Konfiguration (.env)...${NC}"
+    USE_SYSTEM=false
+else
+    read -rp "🤩 Soll der Dienst systemweit laufen? (y/N): " USE_SYSTEM
+fi
+
+if [[ "$USE_SYSTEM" =~ ^[Yy]$ ]]; then
+    SERVICE_FILE="/etc/systemd/system/klipper-conf-git.service"
+    SYSTEM_WIDE=true
+else
+    SERVICE_FILE="$HOME/.config/systemd/user/klipper-conf-git.service"
+    SYSTEM_WIDE=false
 fi
 
 rm -rf "$BASE_DIR"
@@ -77,20 +86,17 @@ read -rp "🛠️  Soll 'updatemcu.sh' nach jedem Commit ausgeführt werden? (y/
 USE_MCU_UPDATE=false
 [[ "$USE_MCU" =~ ^[Yy]$ ]] && USE_MCU_UPDATE=true
 
-# Prüfen auf eingebettete Repos und ggf. löschen
+# Sicherstellen, dass Konfig-Verzeichnis vorhanden ist
 for dir in "${WATCH_DIRS[@]}"; do
-    if [ -d "$dir/.git" ]; then
-        echo -e "${RED}⚠️  Warnung: '$dir' ist ein Git-Repository.${NC}"
-        read -rp "❌ Soll .git in '$dir' entfernt werden? (y/N): " rm_git
-        if [[ "$rm_git" =~ ^[Yy]$ ]]; then
-            rm -rf "$dir/.git"
-            echo -e "${YLW}📁 Entfernt: $dir/.git${NC}"
-        else
-            echo -e "${RED}⛔ Abbruch – eingebettetes Repo vorhanden.${NC}"
-            exit 1
-        fi
+    if [ ! -d "$dir" ]; then
+        echo -e "${RED}❌ Verzeichnis nicht gefunden: $dir${NC}"
+        echo -e "${RED}Bitte sicherstellen, dass alle überwachten Verzeichnisse vorhanden sind.${NC}"
+        exit 1
     fi
-done
+fi
+
+# [Restlicher Inhalt folgt danach wie gehabt ... z. B. .env schreiben, Script- und Service-Setup, Repo erstellen usw.]
+
 
 # .env erzeugen
 cat > "$ENV_FILE" <<EOF
