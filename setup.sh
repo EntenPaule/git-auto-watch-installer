@@ -220,28 +220,27 @@ ${RED}🔴 Dienst konnte nicht gestartet werden.${NC}"
     journalctl --user -u klipper-conf-git.service --no-pager -n 10
 fi
 
-# Update-Manager-Eintrag erstellen
-UPDATE_CFG="$HOME/printer_data/config/update_manager.cfg"
+# Update-Manager-Eintrag direkt in moonraker.conf schreiben
+MOON_CFG="$HOME/printer_data/config/moonraker.conf"
 INSTALLER_NAME="git-auto-watch-installer"
 
-mkdir -p "$(dirname "$UPDATE_CFG")"
-if [ ! -f "$UPDATE_CFG" ]; then
-    echo -e "${YLW}📄 update_manager.cfg wird neu erstellt ...${NC}"
-    touch "$UPDATE_CFG"
-fi
-
-if grep -q "^\[$INSTALLER_NAME\]" "$UPDATE_CFG" 2>/dev/null; then
-    echo -e "${YLW}ℹ️  Update Manager-Eintrag für '$INSTALLER_NAME' existiert bereits.${NC}"
+if grep -q "^\[update_manager $INSTALLER_NAME\]" "$MOON_CFG" 2>/dev/null; then
+    echo -e "${YLW}ℹ️  Update Manager-Eintrag für '$INSTALLER_NAME' existiert bereits in moonraker.conf.${NC}"
 else
-    echo -e "${YLW}➕ Trage '$INSTALLER_NAME' in update_manager.cfg ein...${NC}"
-    cat >> "$UPDATE_CFG" <<EOF
+    echo -e "${YLW}➕ Trage '$INSTALLER_NAME' in moonraker.conf ein...${NC}"
+    cat >> "$MOON_CFG" <<EOF
 
-[$INSTALLER_NAME]
+[update_manager $INSTALLER_NAME]
 type: git_repo
 path: $HOME/git-auto-watch-installer
 origin: https://github.com/$GITHUB_USER/git-auto-watch-installer.git
 EOF
     echo -e "${GRN}✅ Update Manager-Eintrag hinzugefügt.${NC}"
+
+    echo -e "${YLW}🔁 Starte Moonraker neu, damit der Eintrag aktiv wird...${NC}"
+    sudo systemctl restart moonraker.service
+    echo -e "${GRN}✅ Moonraker wurde neu gestartet.${NC}"
+fi
 fi
 fi
 
