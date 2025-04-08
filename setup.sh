@@ -104,7 +104,6 @@ for dir in "${WATCH_DIRS[@]}"; do
         echo -e "${RED}Bitte sicherstellen, dass alle überwachten Verzeichnisse vorhanden sind.${NC}"
         exit 1
     fi
-fi
 done
 # .env erzeugen
 cat > "$ENV_FILE" <<EOF
