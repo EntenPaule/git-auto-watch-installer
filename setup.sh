@@ -144,32 +144,33 @@ log "Starte Überwachung..."
 while true; do
     inotifywait -r -e modify,create,delete,move $WATCH_DIRS > /dev/null 2>&1
 
-    flock "$LOCKFILE" -c bash <<'INNER'
-for dir in $WATCH_DIRS; do
-    name=$(basename "$dir")
-    target="$REPO_DIR/$name"
-    mkdir -p "$target"
+    ( flock -n 9 || exit 1
 
-    rsync -a --delete --checksum "$dir/" "$target/"
+        for dir in $WATCH_DIRS; do
+            name=$(basename "$dir")
+            target="$REPO_DIR/$name"
+            mkdir -p "$target"
 
-    cd "$REPO_DIR" || continue
-    git add -A
+            rsync -a --delete --checksum "$dir/" "$target/"
 
-    if ! git diff --cached --quiet; then
-        TIMESTAMP=$(date "+%Y-%m-%d %H:%M:%S")
-        git commit -m "Auto-Update: $TIMESTAMP"
-        git push origin "$BRANCH" > /dev/null 2>&1
-        log "Änderung gepusht: $TIMESTAMP"
+            cd "$REPO_DIR" || continue
+            git add -A
 
-        if [ "$USE_MCU_UPDATE" = true ]; then
-            MCU="$HOME/printer_data/config/script/updatemcu.sh"
-            [ -x "$MCU" ] && "$MCU" && log "MCU-Skript ausgeführt"
-        fi
-    else
-        debug "Keine Änderungen erkannt"
-    fi
-done
-INNER
+            if ! git diff --cached --quiet; then
+                TIMESTAMP=$(date "+%Y-%m-%d %H:%M:%S")
+                git commit -m "Auto-Update: $TIMESTAMP"
+                git push origin "$BRANCH" > /dev/null 2>&1
+                log "Änderung gepusht: $TIMESTAMP"
+
+                if [ "$USE_MCU_UPDATE" = true ]; then
+                    MCU="$HOME/printer_data/config/script/updatemcu.sh"
+                    [ -x "$MCU" ] && "$MCU" && log "MCU-Skript ausgeführt"
+                fi
+            else
+                debug "Keine Änderungen erkannt"
+            fi
+        done
+    ) 9>"$LOCKFILE"
 done
 EOF
 
