@@ -28,7 +28,7 @@ README.md         → Diese Anleitung
 1. Repository klonen:
 
 ```bash
-git clone git@github.com:EntenPaule/git-auto-watch-installer.git
+git clone https://github.com/EntenPaule/git-auto-watch-installer.git
 cd git-auto-watch-installer
 ```
 
