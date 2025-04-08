@@ -103,6 +103,13 @@ systemctl --user status git-auto-watch.service
 
 ## 🧼 Rückgängig machen / Deinstallation
 
+### Automatisch
+```bash
+chmod +x uninstall-git-auto-watch.sh
+./uninstall-git-auto-watch.sh
+```
+
+### Manuell
 ### Systemd-Service stoppen & entfernen:
 
 ```bash
@@ -249,6 +256,14 @@ systemctl --user status git-auto-watch.service
 ---
 
 ## 🧼 Undo / Uninstall
+
+### Automatic
+```bash
+chmod +x uninstall-git-auto-watch.sh
+./uninstall-git-auto-watch.sh
+```
+
+### Manuel
 
 ### Stop and disable systemd service:
 
