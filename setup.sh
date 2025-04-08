@@ -28,7 +28,14 @@ REPO_DIR="$BASE_DIR/local-repo"
 WATCH_DIRS=("$HOME/printer_data/config" "$HOME/printer_data/database")
 SCRIPT_FILE="/usr/local/bin/git-auto-watch.sh"
 ENV_FILE="$BASE_DIR/.env"
-SERVICE_FILE="$HOME/.config/systemd/user/klipper-conf-git.service"
+read -rp "🧩 Soll der Dienst systemweit laufen? (y/N): " USE_SYSTEM
+if [[ "$USE_SYSTEM" =~ ^[Yy]$ ]]; then
+    SERVICE_FILE="/etc/systemd/system/klipper-conf-git.service"
+    SYSTEM_WIDE=true
+else
+    SERVICE_FILE="$HOME/.config/systemd/user/klipper-conf-git.service"
+    SYSTEM_WIDE=false
+fi
 LOG_FILE="$BASE_DIR/git-auto-watch.log"
 BRANCH="master"
 
@@ -204,20 +211,33 @@ Environment=ENV_FILE=$ENV_FILE
 WantedBy=default.target
 EOF
 
-systemctl --user daemon-reexec
-systemctl --user enable --now klipper-conf-git.service
+if [ "$SYSTEM_WIDE" = true ]; then
+    sudo systemctl daemon-reexec
+    sudo systemctl enable --now klipper-conf-git.service
+else
+    systemctl --user daemon-reexec
+    systemctl --user enable --now klipper-conf-git.service
+fi
 
 
 # Selbsttest
 sleep 1
-STATUS=$(systemctl --user is-active klipper-conf-git.service)
+if [ "$SYSTEM_WIDE" = true ]; then
+    STATUS=$(sudo systemctl is-active klipper-conf-git.service)
+else
+    STATUS=$(systemctl --user is-active klipper-conf-git.service)
+fi
 if [ "$STATUS" = "active" ]; then
     echo -e "
 ${GRN}🟢 Dienst läuft einwandfrei.${NC}"
 else
     echo -e "
 ${RED}🔴 Dienst konnte nicht gestartet werden.${NC}"
+    if [ "$SYSTEM_WIDE" = true ]; then
+    sudo journalctl -u klipper-conf-git.service --no-pager -n 10
+else
     journalctl --user -u klipper-conf-git.service --no-pager -n 10
+fi
 fi
 
 # Update-Manager-Eintrag direkt in moonraker.conf schreiben
@@ -241,6 +261,9 @@ EOF
     echo -e "${YLW}🔁 Starte Moonraker neu, damit der Eintrag aktiv wird...${NC}"
     sudo systemctl restart moonraker.service
     echo -e "${GRN}✅ Moonraker wurde neu gestartet.${NC}"
+fi
+fi
+fi
 
 # moonraker.asvc Eintrag für Service-Verwaltung
 ASVC_FILE="$HOME/printer_data/moonraker.asvc"
