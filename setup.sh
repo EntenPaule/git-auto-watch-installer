@@ -58,6 +58,21 @@ read -rp "🛠️  Soll 'updatemcu.sh' nach jedem Commit ausgeführt werden? (y/
 USE_MCU_UPDATE=false
 [[ "$USE_MCU" =~ ^[Yy]$ ]] && USE_MCU_UPDATE=true
 
+# Prüfen auf eingebettete Repos und ggf. löschen
+for dir in "${WATCH_DIRS[@]}"; do
+    if [ -d "$dir/.git" ]; then
+        echo -e "${RED}⚠️  Warnung: '$dir' ist ein Git-Repository.${NC}"
+        read -rp "❌ Soll .git in '$dir' entfernt werden? (y/N): " rm_git
+        if [[ "$rm_git" =~ ^[Yy]$ ]]; then
+            rm -rf "$dir/.git"
+            echo -e "${YLW}📁 Entfernt: $dir/.git${NC}"
+        else
+            echo -e "${RED}⛔ Abbruch – eingebettetes Repo vorhanden.${NC}"
+            exit 1
+        fi
+    fi
+done
+
 # .env erzeugen
 cat > "$ENV_FILE" <<EOF
 REPO_DIR="$REPO_DIR"
