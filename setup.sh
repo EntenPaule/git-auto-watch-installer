@@ -125,6 +125,56 @@ fi
 git remote add origin "git@github.com:$GITHUB_USER/$REPO_NAME.git"
 git push -u origin "$BRANCH" --force
 
+# git-auto-watch.sh erzeugen
+cat > "$SCRIPT_FILE" <<'EOF'
+#!/bin/bash
+
+source "$(dirname "$0")/.env"
+
+log() {
+    [ "$ENABLE_LOGGING" = true ] && echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "$LOG_FILE"
+}
+debug() {
+    [ "$ENABLE_DEBUG" = true ] && log "DEBUG: $*"
+}
+
+LOCKFILE="/tmp/git-auto-watch.lock"
+log "Starte Überwachung..."
+
+while true; do
+    inotifywait -r -e modify,create,delete,move $WATCH_DIRS > /dev/null 2>&1
+
+    flock "$LOCKFILE" -c '
+        for dir in '"${WATCH_DIRS[*]}"'; do
+            name=$(basename "$dir")
+            target="$REPO_DIR/$name"
+            mkdir -p "$target"
+
+            rsync -a --delete --checksum "$dir/" "$target/"
+
+            cd "$REPO_DIR" || continue
+            git add -A
+
+            if ! git diff --cached --quiet; then
+                TIMESTAMP=$(date "+%Y-%m-%d %H:%M:%S")
+                git commit -m "Auto-Update: $TIMESTAMP"
+                git push origin "$BRANCH" > /dev/null 2>&1
+                log "Änderung gepusht: $TIMESTAMP"
+
+                if [ "$USE_MCU_UPDATE" = true ]; then
+                    MCU="$HOME/printer_data/config/script/updatemcu.sh"
+                    [ -x "$MCU" ] && "$MCU" && log "MCU-Skript ausgeführt"
+                fi
+            else
+                debug "Keine Änderungen erkannt"
+            fi
+        done
+    '
+done
+EOF
+
+chmod +x "$SCRIPT_FILE"
+
 # systemd-Service erstellen
 cat > "$SERVICE_FILE" <<EOF
 [Unit]
