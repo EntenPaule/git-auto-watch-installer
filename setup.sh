@@ -13,14 +13,9 @@ GIT_EMAIL="git@entenpaule.local"
 GITHUB_USER="EntenPaule"
 
 # === Allgemeine Einstellungen ===
-
-# Wenn .env existiert, Werte laden und Setup überspringen
-if [ -f "$HOME/git-auto-watch/.env" ]; then
-    echo -e "
-${GRN}⚙️  Vorhandene Konfiguration gefunden – .env wird verwendet.${NC}"
-    source "$HOME/git-auto-watch/.env"
-    echo -e "${YLW}⏩ Setup wird übersprungen.${NC}"
-    exit 0
+FORCE=false
+if [[ "$1" == "--force" ]]; then
+    FORCE=true
 fi
 
 BASE_DIR="$HOME/git-auto-watch"
@@ -28,7 +23,7 @@ REPO_DIR="$BASE_DIR/local-repo"
 WATCH_DIRS=("$HOME/printer_data/config" "$HOME/printer_data/database")
 SCRIPT_FILE="/usr/local/bin/git-auto-watch.sh"
 ENV_FILE="$BASE_DIR/.env"
-read -rp "🧩 Soll der Dienst systemweit laufen? (y/N): " USE_SYSTEM
+read -rp "🤩 Soll der Dienst systemweit laufen? (y/N): " USE_SYSTEM
 if [[ "$USE_SYSTEM" =~ ^[Yy]$ ]]; then
     SERVICE_FILE="/etc/systemd/system/klipper-conf-git.service"
     SYSTEM_WIDE=true
@@ -38,6 +33,13 @@ else
 fi
 LOG_FILE="$BASE_DIR/git-auto-watch.log"
 BRANCH="master"
+
+if [ -f "$ENV_FILE" ] && [ "$FORCE" = false ]; then
+    echo -e "\n${GRN}⚙️  Vorhandene Konfiguration gefunden – .env wird verwendet.${NC}"
+    source "$ENV_FILE"
+    echo -e "${YLW}⏩ Setup wird übersprungen.${NC}"
+    exit 0
+fi
 
 rm -rf "$BASE_DIR"
 mkdir -p "$REPO_DIR"
@@ -50,7 +52,7 @@ if [ ! -f "$HOME/.ssh/id_ed25519" ]; then
     echo ""
     echo -e "${BLU}📋 Öffentlichen Schlüssel zu GitHub hinzufügen:${NC}"
     cat "$HOME/.ssh/id_ed25519.pub"
-    echo -e "${BLU}👉 https://github.com/settings/ssh/new${NC}"
+    echo -e "${BLU}🔙 https://github.com/settings/ssh/new${NC}"
     read -rsp $'\n🔑 Sobald der Schlüssel hinzugefügt ist, drücke [Enter] ...\n'
 fi
 
