@@ -112,6 +112,10 @@ for dir in "${WATCH_DIRS[@]}"; do
         echo -e "${YLW}📁 Erstelle Verzeichnis: $dir${NC}"
         mkdir -p "$dir"
     fi
+    
+    if [ ! -f "$dir/.gitkeep" ]; then
+        touch "$dir/.gitkeep"
+    fi
 
 done
 
