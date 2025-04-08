@@ -18,7 +18,11 @@ if [[ "$1" == "--force" ]]; then
     FORCE=true
 fi
 
-BASE_DIR="$HOME/git-auto-watch"
+# Benutzerverzeichnis korrekt ermitteln, auch unter sudo
+REAL_USER=$(logname)
+REAL_USER_HOME=$(eval echo ~$REAL_USER)
+
+BASE_DIR="$REAL_USER_HOME/git-auto-watch"
 ENV_FILE="$BASE_DIR/.env"
 
 if [ -f "$ENV_FILE" ] && [ "$FORCE" = false ]; then
@@ -29,24 +33,25 @@ if [ -f "$ENV_FILE" ] && [ "$FORCE" = false ]; then
 fi
 
 REPO_DIR="$BASE_DIR/local-repo"
-WATCH_DIRS=("$HOME/printer_data/config" "$HOME/printer_data/database")
+WATCH_DIRS=("$REAL_USER_HOME/printer_data/config" "$REAL_USER_HOME/printer_data/database")
 SCRIPT_FILE="/usr/local/bin/git-auto-watch.sh"
 SERVICE_FILE=""
 LOG_FILE="$BASE_DIR/git-auto-watch.log"
 BRANCH="master"
 
-if [ "$FORCE" = true ]; then
-    echo -e "${YLW}⚠️  Erzwinge Setup trotz vorhandener Konfiguration (.env)...${NC}"
-    USE_SYSTEM=false
-else
-    read -rp "🤩 Soll der Dienst systemweit laufen? (y/N): " USE_SYSTEM
+USE_SYSTEM=false
+if [ "$FORCE" = false ]; then
+    read -rp "🤩 Soll der Dienst systemweit laufen? (y/N): " USE_SYSTEM_INPUT
+    if [[ "$USE_SYSTEM_INPUT" =~ ^[Yy]$ ]]; then
+        USE_SYSTEM=true
+    fi
 fi
 
-if [[ "$USE_SYSTEM" =~ ^[Yy]$ ]]; then
+if [[ "$USE_SYSTEM" = true ]]; then
     SERVICE_FILE="/etc/systemd/system/klipper-conf-git.service"
     SYSTEM_WIDE=true
 else
-    SERVICE_FILE="$HOME/.config/systemd/user/klipper-conf-git.service"
+    SERVICE_FILE="$REAL_USER_HOME/.config/systemd/user/klipper-conf-git.service"
     SYSTEM_WIDE=false
 fi
 
@@ -55,19 +60,19 @@ mkdir -p "$REPO_DIR"
 mkdir -p "$(dirname "$SERVICE_FILE")"
 
 # SSH-Key erzeugen, falls nicht vorhanden
-if [ ! -f "$HOME/.ssh/id_ed25519" ]; then
+if [ ! -f "$REAL_USER_HOME/.ssh/id_ed25519" ]; then
     echo -e "${YLW}🔐 Erstelle SSH-Key für GitHub...${NC}"
-    ssh-keygen -t ed25519 -C "$GIT_EMAIL" -N "" -f "$HOME/.ssh/id_ed25519"
+    sudo -u "$REAL_USER" ssh-keygen -t ed25519 -C "$GIT_EMAIL" -N "" -f "$REAL_USER_HOME/.ssh/id_ed25519"
     echo ""
     echo -e "${BLU}📋 Öffentlichen Schlüssel zu GitHub hinzufügen:${NC}"
-    cat "$HOME/.ssh/id_ed25519.pub"
+    cat "$REAL_USER_HOME/.ssh/id_ed25519.pub"
     echo -e "${BLU}🔙 https://github.com/settings/ssh/new${NC}"
     read -rsp $'\n🔑 Sobald der Schlüssel hinzugefügt ist, drücke [Enter] ...\n'
 fi
 
 # Git-User konfigurieren
-git config --global user.name "$GIT_NAME"
-git config --global user.email "$GIT_EMAIL"
+sudo -u "$REAL_USER" git config --global user.name "$GIT_NAME"
+sudo -u "$REAL_USER" git config --global user.email "$GIT_EMAIL"
 
 # Pakete installieren
 function install_if_missing() {
@@ -87,7 +92,7 @@ install_if_missing git inotify-tools curl rsync
 
 # Benutzerabfragen
 DEFAULT_REPO="$(hostname)"
-read -rp "📦 GitHub-Repo-Name [$DEFAULT_REPO]: " REPO_NAME
+read -rp "📦 GitHub-Repo-Name [${DEFAULT_REPO}]: " REPO_NAME
 REPO_NAME=${REPO_NAME:-$DEFAULT_REPO}
 
 read -rp "🔑 GitHub Token (wird nur lokal gespeichert): " GITHUB_TOKEN
@@ -95,7 +100,9 @@ echo ""
 
 read -rp "🛠️  Soll 'updatemcu.sh' nach jedem Commit ausgeführt werden? (y/N): " USE_MCU
 USE_MCU_UPDATE=false
-if [[ "$USE_MCU" =~ ^[Yy]$ ]]; then USE_MCU_UPDATE=true; fi
+if [[ "$USE_MCU" =~ ^[Yy]$ ]]; then
+    USE_MCU_UPDATE=true
+fi
 
 # Sicherstellen, dass Konfig-Verzeichnis vorhanden ist
 for dir in "${WATCH_DIRS[@]}"; do
@@ -104,10 +111,12 @@ for dir in "${WATCH_DIRS[@]}"; do
         echo -e "${RED}Bitte sicherstellen, dass alle überwachten Verzeichnisse vorhanden sind.${NC}"
         exit 1
     fi
+
 done
+
 # .env erzeugen
 cat > "$ENV_FILE" <<EOF
-REPO_DIR="$REPO_DIR"
+WATCH_DIRS="${WATCH_DIRS[*]}"
 GITHUB_USER="$GITHUB_USER"
 REPO_NAME="$REPO_NAME"
 GITHUB_TOKEN="$GITHUB_TOKEN"
@@ -116,10 +125,11 @@ ENABLE_LOGGING=true
 ENABLE_DEBUG=true
 USE_MCU_UPDATE=$USE_MCU_UPDATE
 LOG_FILE="$LOG_FILE"
-WATCH_DIRS="${WATCH_DIRS[*]}"
 EOF
 
 chmod 600 "$ENV_FILE"
+
+echo -e "${GRN}✅ .env-Datei erstellt unter $ENV_FILE${NC}"
 
 # Git-Repo initialisieren
 cd "$REPO_DIR"
